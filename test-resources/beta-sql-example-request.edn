@@ -1,0 +1,8 @@
+{:parameters
+ {:body
+  {:tx-type "sql-beta",
+   :tx-batches
+   [{:txs
+     "INSERT INTO docs (_id, col1) VALUES (1, 'foo');\nINSERT INTO docs RECORDS {_id: 2, col1: 'bar', col2:' baz'};",
+     :system-time nil}],
+   :query "SELECT * FROM docs"}}}

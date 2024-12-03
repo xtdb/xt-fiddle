@@ -2,6 +2,8 @@
   (:refer-clojure :exclude [list])
   (:require [re-frame.core :as rf]))
 
+;; TODO: TESTS
+
 ;; Goals:
 ;; - Batches are in a consistent order for rendering
 ;; - Batches are accessed via a consistent key
@@ -88,8 +90,10 @@ INSERT INTO docs RECORDS {_id: 2, col1: 'bar', col2:' baz'};")
 (defn default [type]
   {:system-time nil
    :txs (case type
-          :xtql default-dml
-          :sql default-sql-insert)})
+          :xtql
+          default-dml
+          ;;default
+          default-sql-insert)})
 
 (defn param-encode [tx-batches]
   (-> tx-batches clj->js js/JSON.stringify js/btoa))

@@ -1,0 +1,27 @@
+{:parameters
+ {:body
+  {:tx-type "sql",
+ :tx-batches
+ [{:txs "INSERT INTO people (_id, name) VALUES (6, 'fred')",
+   :system-time "2024-01-01T00:00:00.000Z"}
+  {:txs
+   "INSERT INTO people (_id, name, likes)\nVALUES (9, 'bob', ['fishing', 3.14, {nested:'data'}])",
+   :system-time "2024-01-02T00:00:00.000Z"}
+  {:txs
+   "INSERT INTO people\nRECORDS {_id: 6,\n         name: 'fred',\n         info: {contact: [{loc: 'home',\n                           tel: '123'},\n                          {loc: 'work',\n                           tel: '456',\n                           registered: DATE '2024-01-01'}]}}",
+   :system-time "2024-01-03T00:00:00.000Z"}
+  {:txs "DELETE FROM people WHERE name = 'fred'",
+   :system-time "2024-01-04T00:00:00.000Z"}
+  {:txs
+   "INSERT INTO people (_id, name, info)\nSELECT _id, name, info\nFROM people FOR ALL SYSTEM_TIME\nWHERE _id = 6\nORDER BY _system_to DESC\nLIMIT 1",
+   :system-time "2024-01-05T00:00:00.000Z"}
+  {:txs "ERASE FROM people WHERE _id = 6",
+   :system-time "2024-01-06T00:00:00.000Z"}
+  {:txs
+   "INSERT INTO people (_id, name, favorite_color, _valid_from)\nVALUES (2, 'carol', 'blue', DATE '2023-01-01')",
+   :system-time "2024-01-07T00:00:00.000Z"}
+  {:txs
+   "INSERT INTO people (_id, name, favorite_color, _valid_from)\nVALUES (2, 'carol', 'red', DATE '2023-09-01')",
+   :system-time "2024-01-08T00:00:00.000Z"}],
+ :query
+ "SETTING DEFAULT VALID_TIME AS OF DATE '2023-10-01',\n      DEFAULT SYSTEM_TIME AS OF DATE '2024-01-08'\nSELECT name, favorite_color , _valid_from, _system_from FROM people"}}}
