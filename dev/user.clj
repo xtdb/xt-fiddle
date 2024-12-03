@@ -10,6 +10,10 @@
 (defn browse [port]
   (browse/browse-url (str "http://localhost:" port)))
 
+(defn browse! []
+  (browse 8000)
+  (browse 9630))
+
 (defn watch-deps!
   []
   (watch-deps/start! {:aliases [:dev :test]}))
