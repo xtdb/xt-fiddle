@@ -4,6 +4,7 @@
             [xt-play.query-params :as query-params]
             [xt-play.clipboard :as clipboard]
             [xt-play.href :as href]
+            [reagent.core :as r]
             [xt-play.highlight :as hl]
             [xt-play.tx-batch :as tx-batch]
             [xt-play.query :as query]
@@ -74,14 +75,24 @@
   :version
   :-> :version)
 
+(defn- value->label [items]
+  (partial
+   (apply merge
+          (map (fn [{:keys [value label]}]
+                 {value label})
+               items))))
+
+(def items
+  [{:value :sql :label "SQL"}
+   {:value :xtql :label "XTQL"}
+   {:value :sql-beta :label "Beta"}])
+
 (defn language-dropdown []
-  [dropdown {:items [{:value :sql :label "SQL"}
-                     {:value :xtql :label "XTQL"}]
-             :selected @(rf/subscribe [:get-type])
-             :on-click #(rf/dispatch [:dropdown-selection (:value %)])
-             :label (case @(rf/subscribe [:get-type])
-                      :xtql "XTQL"
-                      :sql "SQL")}])
+  (let [tx-type @(rf/subscribe [:get-type])]
+    [dropdown {:items items
+               :selected tx-type
+               :on-click #(rf/dispatch [:dropdown-selection (:value %)])
+               :label (get (value->label items) tx-type)}]))
 
 (defn spinner []
   [:div "Loading..."])
@@ -102,30 +113,26 @@
 
 (defn display-table [results type]
   (when results
-    (let [all-keys (->> results
-                        (mapcat keys)
-                        (into #{})
-                        (sort))]
-      [:table {:class "table-auto w-full"}
-       [:thead
+    [:table {:class "table-auto w-full"}
+     [:thead
+      [:tr {:class "border-b"}
+       (for [label (first results)]
+         ^{:key label}
+         [:th {:class "text-left p-4"} label])]]
+     [:tbody
+      (for [[i row] (map-indexed vector (rest results))]
+        ^{:key (str "row-" i)}
         [:tr {:class "border-b"}
-         (for [k all-keys]
-           ^{:key k}
-           [:th {:class "text-left p-4"}
-            (-> k symbol str)])]]
-       [:tbody
-        (for [[i row] (map-indexed vector results)]
-          ^{:key i}
-          [:tr {:class "border-b"}
-           (for [k all-keys]
-             ^{:key k}
-             [:td {:class "text-left p-4"}
-              (let [value (get row k)]
-                (case type
-                  :xtql [hl/code {:language "clojure"}
-                         (pr-str value)]
-                  :sql [hl/code {:language "json"}
-                        (js/JSON.stringify (clj->js value))]))])])]])))
+         (for [[ii value] (map-indexed vector row)]
+           ^{:key (str "row-" i " col-" ii)}
+           [:td {:class "text-left p-4"}
+            (case type
+              :xtql
+              [hl/code {:language "clojure"}
+               (pr-str value)]
+              ;; default
+              [hl/code {:language "json"}
+               (js/JSON.stringify (clj->js value))])])])]]))
 
 (defn title [& body]
   (into [:h2 {:class "text-lg font-semibold"}]
@@ -158,23 +165,42 @@
         "Copied!"
         [:> CheckCircleIcon {:class "h-5 w-5"}]])]))
 
+(def logo
+  [:a {:href "/"}
+   [:div {:class "flex flex-row items-center gap-1"}
+    [:img {:class "h-8"
+           :src "/public/images/xtdb-full-logo.svg"}]
+    [title "Play"]]])
+
 (defn header []
-  [:header {:class "bg-gray-200 py-2 px-4"}
+  [:header {:class "sticky top-0 z-50 bg-gray-200 py-2 px-4"}
    [:div {:class "container mx-auto flex flex-col md:flex-row items-center gap-1"}
     [:div {:class "w-full flex flex-row items-center gap-4"}
-     [:a {:href "/"}
-      [:div {:class "flex flex-row items-center gap-1"}
-       [:img {:class "h-8"
-              :src "/public/images/xtdb-full-logo.svg"}]
-       [title "Play"]]]
+     logo
      [:span {:class "text-sm text-gray-400"}
       @(rf/subscribe [:version])]]
     [:div {:class "max-md:hidden flex-grow"}]
     [:div {:class "w-full flex flex-row items-center gap-1 md:justify-end"}
-     [language-dropdown]
      [:div {:class "md:hidden flex-grow"}]
+     [language-dropdown]
      [copy-button]
      [run-button]]]])
+
+(def beta-copy
+  (str "We are currently testing a new SQL framework for XTDB Play which utilises more of XTDB 2.0s powerful new features. "
+       "Feel free to stick arround and have a play, but if you want to return to safty, select a different mode from the dropdown"))
+
+(defn- beta-banner []
+  (let [expanded? (r/atom false)]
+    (fn []
+      [:footer {:class "sticky bottom-0 z-50 bg-red-200 py-2 px-4"}
+       [:div {:class "container text-red-900 mx-auto flex flex-col items-center gap-1 cursor-pointer"
+              :on-click #(swap! expanded? not)}
+        (if-not @expanded?
+          ;; todo, this can be nicer.
+          [:p {:class "fa-regular fa-question-circle"} 
+           " You are in beta mode. Click here to find out more."]
+          [:p beta-copy])]])))
 
 (defn reset-system-time-button [id]
   [:> ArrowUturnLeftIcon {:class "h-5 w-5 cursor-pointer"
@@ -256,38 +282,50 @@
             :on-change #(rf/dispatch [:fx [[:dispatch [:set-query %]]
                                            [:dispatch [:update-url]]]])}]])
 
+(def ^:private initial-message [:p {:class "text-gray-400"} "Enter a query to see results"])
+(def ^:private no-results-message "No results returned")
+(defn- empty-rows-message [results] (str (count results) " empty row(s) returned"))
+
 (defn results []
   [:section {:class "md:h-1/2 mx-4 flex flex-1 flex-col"}
    [:h2 "Results:"]
    [:div {:class "grow min-h-0 border p-2 overflow-auto"}
     (if @(rf/subscribe [::run/loading?])
       [spinner]
-      (let [{::run/keys [results failure]} @(rf/subscribe [::run/results-or-failure])]
+      (let [{::run/keys [results failure response?]} @(rf/subscribe [::run/results-or-failure])]
         (if failure
           [display-error failure]
           (cond
-            (empty? results) "No results returned"
-            (every? empty? results) (str (count results) " empty row(s) returned")
-            :else [display-table results @(rf/subscribe [:get-type])]))))]])
+            (not response?) initial-message
+            (empty? results) no-results-message
+            (every? empty? results) (empty-rows-message results)
+            :else
+            [display-table results @(rf/subscribe [:get-type])]))))]])
 
 (defn app []
-  [:div {:class "flex flex-col h-dvh"}
-   [header]
-   ;; overflow-hidden fixes a bug where if an editor would have content that goes off the
-   ;; screen the whole page would scroll.
-   [:div {:class "py-2 flex-grow md:overflow-hidden h-full flex flex-col gap-2"}
-    [:section {:class "md:h-1/2 flex flex-col md:flex-row flex-1 gap-2"}
-     (let [editor (case @(rf/subscribe [:get-type])
-                    :xtql editor/clj-editor
-                    :sql editor/sql-editor)]
-       [:<>
-        [transactions {:editor editor}]
-        [:hr {:class "md:hidden"}]
-        [query {:editor editor}]
-        [:div {:class "md:hidden flex flex-col items-center"}
-         [run-button]]])]
-    (when (or @(rf/subscribe [::run/loading?])
-              @(rf/subscribe [::run/results?]))
-      [:<>
-       [:hr {:class "md:hidden"}]
-       [results]])]])
+  (let [tx-type (rf/subscribe [:get-type])]
+    (fn []
+      [:div {:class "flex flex-col h-dvh"}
+       [header]
+       ;; overflow-hidden fixes a bug where if an editor would have content that goes off the
+       ;; screen the whole page would scroll.
+       [:div {:class "py-2 flex-grow md:overflow-hidden h-full flex flex-col gap-2"}
+        [:section {:class "md:h-1/2 flex flex-col md:flex-row flex-1 gap-2"}
+         (let [editor (case @tx-type
+                        :xtql
+                        editor/clj-editor
+                        ;; default
+                        editor/sql-editor)]
+           [:<>
+            [transactions {:editor editor}]
+            [:hr {:class "md:hidden"}]
+            [query {:editor editor}]
+            [:div {:class "md:hidden flex flex-col items-center"}
+             [run-button]]])]
+        (when (or @(rf/subscribe [::run/loading?])
+                  @(rf/subscribe [::run/results?]))
+          [:<>
+           [:hr {:class "md:hidden"}]
+           [results]])]
+       (when (= :sql-beta @tx-type)
+         [beta-banner])])))

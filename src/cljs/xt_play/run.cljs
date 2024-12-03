@@ -4,45 +4,38 @@
             [re-frame.core :as rf]
             [ajax.core :as ajax]))
 
-(defn encode-txs [txs type]
-  (case type
-    :sql (->> (str/split txs #";")
-              (remove str/blank?)
-              (map #(do [:sql %]))
-              (vec)
-              (str))
-    :xtql (str "[" txs "]")))
+(defn- to-iso-str [d] (when d (.toISOString d)))
 
-(defn remove-last-semicolon [s]
-  (str/replace s #";\s*$" ""))
+(defn- db-run-opts [{:keys [query type] :as db}]
+  (let [params {:tx-type type
+                :query query
+                :tx-batches
+                (->> (tx-batch/list db)
+                     (map #(update % :system-time to-iso-str)))}]
+    {:method :post
+     :uri "/db-run"
+     :params params
+     :timeout 3000
+     :format (ajax/json-request-format)
+     :response-format (ajax/json-response-format {:keywords? true})
+     :on-success [::request-success]
+     :on-failure [::request-failure]}))
 
-(defn encode-query [query type]
-  (case type
-    :sql (-> query remove-last-semicolon pr-str)
-    :xtql query))
+(rf/reg-event-fx
+ ::run
+ (fn [{:keys [db]}]
+   {:db (-> db
+            (assoc ::loading? true)
+            (dissoc ::response?)
+            (dissoc ::failure ::results))
+    :http-xhrio (db-run-opts db)}))
 
-(rf/reg-event-fx ::run
-  (fn [{:keys [db]} _]
-    {:db (-> db
-             (assoc ::loading? true)
-             (dissoc ::failure ::results))
-     :http-xhrio {:method :post
-                  :uri "/db-run"
-                  :params {:tx-batches
-                           (->> (tx-batch/list db)
-                                (map #(update % :txs encode-txs (:type db)))
-                                (map #(update % :system-time (fn [d] (when d (.toISOString d))))))
-                           :query (encode-query (:query db) (:type db))}
-                  :timeout 3000
-                  :format (ajax/json-request-format)
-                  :response-format (ajax/json-response-format {:keywords? true})
-                  :on-success [::request-success]
-                  :on-failure [::request-failure]}}))
-
-(rf/reg-event-db ::request-success
+(rf/reg-event-db
+ ::request-success
   (fn [db [_ results]]
     (-> db
         (dissoc ::loading?)
+        (assoc ::response? true)
         (assoc ::results results))))
 
 (rf/reg-event-db ::request-failure
@@ -52,7 +45,7 @@
         (assoc ::failure response))))
 
 (rf/reg-sub ::results-or-failure
-  :-> #(let [results (select-keys % [::results ::failure])]
+  :-> #(let [results (select-keys % [::results ::failure ::response?])]
          (when-not (empty? results)
            results)))
 
@@ -62,3 +55,9 @@
 
 (rf/reg-sub ::loading?
   :-> ::loading?)
+
+(comment
+  (require '[re-frame.db :as db])
+  (def db @db/app-db)
+  (keys db))
+

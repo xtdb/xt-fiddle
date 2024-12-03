@@ -7,5 +7,7 @@
 
 (defn default [type]
   (case type
-    :xtql default-xtql-query
-    :sql default-sql-query))
+    :xtql
+    default-xtql-query
+    ;;default
+    default-sql-query))

@@ -1,28 +1,51 @@
 (ns xt-play.handler
-  (:require [integrant.core :as ig]
-            [clojure.edn :as edn]
+  (:require [clojure.edn :as edn]
             [clojure.instant :refer [read-instant-date]]
             [clojure.spec.alpha :as s]
+            [clojure.string :as str]
             [clojure.tools.logging :as log]
+            [hiccup.page :as h]
+            [integrant.core :as ig]
             [muuntaja.core :as m]
+            [next.jdbc :as jdbc]
+            [next.jdbc.result-set :as jdbc-res]
             [reitit.coercion.spec :as rcs]
             [reitit.dev.pretty :as pretty]
             [reitit.ring :as ring]
             [reitit.ring.coercion :as rrc]
             [reitit.ring.middleware.exception :as exception]
             [reitit.ring.middleware.muuntaja :as muuntaja]
+            [ring.middleware.cors :refer [wrap-cors]]
             [ring.middleware.params :as params]
             [ring.util.response :as response]
-            [ring.middleware.cors :refer [wrap-cors]]
+            [xt-play.util :as util]
             [xtdb.api :as xt]
-            [xtdb.node :as xtn]
-            [hiccup.page :as h]))
+            [xtdb.node :as xtn]))
+
+;; TODO:
+;; [x] Send tx data back asis - data manipulation server side
+;; [x] Beta is an option in the type
+;; [x] Handle multi tx on pgwire
+;; [x] Handle system time on pgwire
+;; [x] Manipulate response data server side
+;; [x] remove btn
+;; [x] banner
+;; [x] logging
+;; [x] handle todos
+;; [] Tests!
+;; [] Refactor - split into more meaningful files
+;; [] - add config, request, response, xt ns
+;; [] - split out ui to components
+;; [] - Better management on subs
+;; [] Handle queries in tx?
+;; [] Display errors in result box
 
 (s/def ::system-time (s/nilable string?))
 (s/def ::txs string?)
 (s/def ::tx-batches (s/coll-of (s/keys :req-un [::system-time ::txs])))
 (s/def ::query string?)
-(s/def ::db-run (s/keys :req-un [::tx-batches ::query]))
+(s/def ::tx-type #{"sql-beta" "xtql" "sql"})
+(s/def ::db-run (s/keys :req-un [::tx-batches ::query ::tx-type]))
 
 (defn- handle-client-error [ex _]
   {:status 400
@@ -59,6 +82,7 @@
     [:meta {:name "description" :content ""}]
     [:link {:rel "stylesheet" :href "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css"}]
     [:link {:rel "stylesheet" :type "text/css" :href "/public/css/main.css"}]
+    [:link {:rel "stylesheet" :href "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"}]
     [:script {:src "https://cdn.tailwindcss.com"}]
     [:script {:async true
               :defer true
@@ -73,42 +97,84 @@
     [:script {:type "text/javascript"}
      "xt_play.app.init()"]]))
 
+(def ^:private db
+  {:dbtype "postgresql"
+   :dbname "xtdb"
+   :user "xtdb"
+   :password "xtdb"
+   :host "localhost"
+   :port 5432})
 
-(comment
-  (with-open [node (xtn/start-node {})]
-    (doseq [st [#inst "2022" #inst "2021"]]
-      (let [tx (xt/submit-tx node [] {:system-time st})
+(def ^:private read-edn (partial edn/read-string {:readers *data-readers*}))
+
+(defn- convert-date [s] (when s (read-instant-date s)))
+
+(defn- encode-txs [tx-type txs]
+  (case (keyword tx-type)
+    :sql (->> (str/split txs #";")
+              (remove str/blank?)
+              (map #(do [:sql %]))
+              (vec))
+    :xtql (read-edn (str "[" txs "]"))
+    ;;else
+    txs))
+
+(defn- run! [node tx-type tx-batches query]
+  (let [tx-batches (->> tx-batches
+                        (map #(update % :system-time convert-date))
+                        (map #(update % :txs (partial encode-txs tx-type))))]
+    (doseq [{:keys [system-time txs] :as batch} tx-batches]
+      (log/info tx-type "running batch: " batch)
+      (let [tx (xt/submit-tx node txs {:system-time system-time})
             results (xt/q node '(from :xt/txs [{:xt/id $tx-id} xt/error])
-                          {:basis {:at-tx tx}
-                           :args {:tx-id (:tx-id tx)}})]
+                          {:args {:tx-id (:tx-id tx)}})]
+        ;; If any transaction fails, throw the error
+        ;; todo - send the error back to the server?
+        (log/info tx-type "batch complete:" tx ", results:" results)
         (when-let [error (-> results first :xt/error)]
-          (throw (ex-info "Transaction error" {:error error})))))))
+          (throw error)))))
+  ;; Run query
+  (log/info tx-type "running query:" query)
+  (let [res (xt/q node query (when (string? query)
+                               {:key-fn :snake-case-string}))]
+    (log/info tx-type "XTDB query response:" res)
+    {:status 200
+     :body (util/map-results->rows res)}))
 
-(defn run-handler [request]
+(defn- prepare-statements
+  "Takes a batch of transactions and prepares the jdbc execution args to
+  be run sequentially"
+  [tx-batches]
+  (for [{:keys [txs system-time]} tx-batches]
+    (remove nil?
+     [(when system-time
+        [(format "BEGIN AT SYSTEM_TIME TIMESTAMP '%s'" system-time)])
+      [txs]
+      (when system-time
+        ["COMMIT"])])))
+
+(defn- run!-with-jdbc-conn [tx-batches query]
+  (with-open [conn (jdbc/get-connection db)]
+    (doseq [tx (prepare-statements tx-batches)
+            statement tx]
+      (log/info "beta executing statement:" statement)
+      (jdbc/execute! conn statement))
+    (log/info "beta running query:" query)
+    (let [res (jdbc/execute! conn [query] {:builder-fn jdbc-res/as-arrays})]
+      (log/info "beta query resoponse" res)
+      {:status 200
+       :body res})))
+
+(defn run-handler [{{body :body} :parameters :as request}]
   (log/debug "run-handler" request)
-  (let [{:keys [tx-batches query]} (get-in request [:parameters :body])
-        ;; TODO: Filter for only the readers required?
-        read-edn (partial edn/read-string {:readers *data-readers*})
-        tx-batches (->> tx-batches
-                        (map #(update % :system-time (fn [s] (when s (read-instant-date s)))))
-                        (map #(update % :txs read-edn)))
-        query (read-edn query)]
-    (log/info :db-run {:tx-batches tx-batches :query query})
+  (let [{:keys [tx-batches query tx-type]} (get-in request [:parameters :body])
+        query (if (= "xtql" tx-type) (read-edn query) query)]
+    (log/info :db-run body)
     (try
       (with-open [node (xtn/start-node {})]
-        ;; Run transactions
-        (doseq [{:keys [system-time txs]} tx-batches]
-          (let [tx (xt/submit-tx node txs {:system-time system-time})
-                results (xt/q node '(from :xt/txs [{:xt/id $tx-id} xt/error])
-                              {:args {:tx-id (:tx-id tx)}})]
-            ;; If any transaction fails, throw the error
-            (when-let [error (-> results first :xt/error)]
-              (throw error))))
-        ;; Run query
-        (let [res (xt/q node query (when (string? query)
-                                     {:key-fn :snake-case-string}))]
-          {:status 200
-           :body res}))
+        (if (= "sql-beta" tx-type)
+          (run!-with-jdbc-conn tx-batches query)
+          (run! node tx-type tx-batches query)))
       (catch Exception e
         (log/warn :submit-error {:e e})
         (throw e)))))
@@ -125,6 +191,7 @@
      {:post {:summary "Run transactions + a query"
              :parameters {:body ::db-run}
              :handler #'run-handler}}]
+
 
     ["/public/*" (ring/create-resource-handler)]]
    {:exception pretty/exception
@@ -147,3 +214,13 @@
 
 (defmethod ig/init-key ::handler [_ _opts]
   handler)
+
+(comment
+  (with-open [node (xtn/start-node {})]
+    (doseq [st [#inst "2022" #inst "2021"]]
+      (let [tx (xt/submit-tx node [] {:system-time st})
+            results (xt/q node '(from :xt/txs [{:xt/id $tx-id} xt/error])
+                          {:basis {:at-tx tx}
+                           :args {:tx-id (:tx-id tx)}})]
+        (when-let [error (-> results first :xt/error)]
+          (throw (ex-info "Transaction error" {:error error})))))))
