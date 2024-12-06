@@ -14,7 +14,9 @@
             [xt-play.model.run :as run]
             [xt-play.model.tx-batch :as tx-batch]))
 
-;; Todo - pull out components to own ns
+;; Todo
+;; - pull out components to own ns
+;; - standardize update / change events
 
 (defn- language-dropdown [tx-type]
   [dropdown {:items model/items
@@ -72,7 +74,9 @@
 
 (defn- run-button []
   [button {:class "bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded-sm"
-           :on-click #(rf/dispatch [::run/run])}
+           :on-click (fn [_]
+                       (rf/dispatch [::run/run])
+                       (rf/dispatch [:update-url]))}
    [:div {:class "flex flex-row gap-1 items-center"}
     "Run"
     [:> PlayIcon {:class "h-5 w-5"}]]])
@@ -84,7 +88,13 @@
                          (when-not @copy-tick
                            " hover:bg-gray-300 cursor-pointer"))
              :disabled @copy-tick
-             :on-click #(rf/dispatch-sync [:copy-url])}
+             :on-click (fn [_]
+                         ;; for more fluid typing, we only update url on
+                         ;; blur. This means that sometimes the url hasn't got
+                         ;; the latest updates from the app-db. Ensure that's
+                         ;; not the case by updating before copying
+                         (rf/dispatch-sync [:update-url])
+                         (rf/dispatch-sync [:copy-url]))}
 
        (if-not @copy-tick
          [:<>
@@ -157,8 +167,8 @@
       [reset-system-time-button id]])
    [editor {:class "border md:flex-grow min-h-36"
             :source txs
-            :on-blur #(rf/dispatch [:fx [[:dispatch [::tx-batch/assoc id :txs %]]
-                                           [:dispatch [:update-url]]]])}]])
+            :on-change #(rf/dispatch [::tx-batch/assoc id :txs %])
+            :on-blur #(rf/dispatch [:update-url])}]])
 
 (defn- multiple-transactions [{:keys [editor]} tx-batches]
   [:<>
@@ -179,8 +189,8 @@
                                                     [:dispatch [:update-url]]]])}]]
       [editor {:class "border md:flex-grow min-h-36"
                :source txs
-               :on-blur #(rf/dispatch [:fx [[:dispatch [::tx-batch/assoc id :txs %]]
-                                              [:dispatch [:update-url]]]])}]])])
+               :on-change #(rf/dispatch [::tx-batch/assoc id :txs %])
+               :on-blur #(rf/dispatch [:update-url])}]])])
 
 (defn- transactions [{:keys [editor]}]
   [:div {:class "mx-4 md:mx-0 md:ml-4 md:flex-1 flex flex-col"}
@@ -207,8 +217,9 @@
    [:h2 "Query:"]
    [editor {:class "md:flex-grow h-full min-h-36 border"
             :source @(rf/subscribe [:query])
+            :on-change #(rf/dispatch [:set-query %])
             :on-blur #(rf/dispatch [:fx [[:dispatch [:set-query %]]
-                                           [:dispatch [:update-url]]]])}]])
+                                         [:dispatch [:update-url]]]])}]])
 
 (def ^:private initial-message [:p {:class "text-gray-400"} "Enter a query to see results"])
 (def ^:private no-results-message "No results returned")
