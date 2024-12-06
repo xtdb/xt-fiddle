@@ -21,14 +21,15 @@
      :on-success [::request-success]
      :on-failure [::request-failure]}))
 
+(defn run [db]
+  {:db (-> db
+           (assoc ::loading? true)
+           (dissoc ::failure ::results ::response?))
+   :http-xhrio (db-run-opts db)})
+
 (rf/reg-event-fx
  ::run
- (fn [{:keys [db]}]
-   {:db (-> db
-            (assoc ::loading? true)
-            (dissoc ::response?)
-            (dissoc ::failure ::results))
-    :http-xhrio (db-run-opts db)}))
+ (fn [{:keys [db]}] (run db)))
 
 (rf/reg-event-db
  ::request-success
