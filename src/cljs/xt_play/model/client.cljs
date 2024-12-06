@@ -1,5 +1,6 @@
 (ns xt-play.model.client
   (:require [re-frame.core :as rf]
+            [xt-play.config :as config]
             [xt-play.model.clipboard :as clipboard]
             [xt-play.model.href :as href]
             [xt-play.model.query :as query]
@@ -23,7 +24,7 @@
   :copy-tick
   :-> :copy-tick)
 
-(defn param-encode [tx-batches]
+(defn- param-encode [tx-batches]
   (-> tx-batches clj->js js/JSON.stringify js/btoa))
 
 (rf/reg-event-fx
@@ -49,7 +50,7 @@
     (assoc db :query query)))
 
 (rf/reg-event-fx
-  :fx ;; todo, use explicit fx
+  :fx ;; todo, use explicit reg-event-fxs
   (fn [_ [_ effects]]
     {:fx effects}))
 
@@ -65,14 +66,7 @@
   :version
   :-> :version)
 
-(defn- value->label [items]
-  (partial
-   (apply merge
-          (map (fn [{:keys [value label]}]
-                 {value label})
-               items))))
-
 (def items
-  [{:value :sql :label "SQL"}
-   {:value :xtql :label "XTQL"}
-   {:value :sql-beta :label "Beta"}])
+  (mapv (fn [[v l]]
+          {:value v, :label l})
+        config/tx-types))

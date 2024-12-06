@@ -1,10 +1,9 @@
 (ns xt-play.model.run
-  (:require
-   [ajax.core :as ajax]
-   [clojure.string :as str]
-   [re-frame.core :as rf]
-   [xt-play.util :as util]
-   [xt-play.model.tx-batch :as tx-batch]))
+  (:require [ajax.core :as ajax]
+            [clojure.string :as str]
+            [re-frame.core :as rf]
+            [xt-play.util :as util]
+            [xt-play.model.tx-batch :as tx-batch]))
 
 (defn- db-run-opts [{:keys [query type] :as db}]
   (let [params {:tx-type type

@@ -1,5 +1,5 @@
 (ns xt-play.app
-  (:require [day8.re-frame.http-fx]
+  (:require [day8.re-frame.http-fx] ;; don't delete
             [lambdaisland.glogi :as log]
             [lambdaisland.glogi.console :as glogi-console]
             [re-frame.core :as rf]
@@ -14,10 +14,11 @@
 
 (log/set-levels
  {:glogi/root   :info})    ;; Set a root logger level, this will be inherited by all loggers
-  ;; 'my.app.thing :trace  ;; Some namespaces you might want detailed logging
+
+;; 'my.app.thing :trace  ;; Some namespaces you might want detailed logging
 
 ;; TODO: Special case existing txs
-(defn param-decode [s]
+(defn- param-decode [s]
   (let [txs (-> s js/atob js/JSON.parse (js->clj :keywordize-keys true))]
     (->> txs
          (map #(update % :system-time (fn [d] (when d (js/Date. d))))))))

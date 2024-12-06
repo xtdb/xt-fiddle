@@ -32,9 +32,11 @@
 ;; [x] - add config, request, response, xt ns
 ;; [x] - split out ui to components
 ;; [x] - Better management on subs
-;; [] cljs tests
+;; [x] cljs tests
 ;; [] Handle queries in tx?
 ;; [] Display errors in result box
+;; [] automated test runners / pipelines
+;; [] extract common tailwind classes, e.g. icon sizes, to standardize
 
 (s/def ::system-time (s/nilable string?))
 (s/def ::tx-batches (s/coll-of (s/keys :req-un [::system-time ::txs])))
@@ -83,7 +85,6 @@
      {:post {:summary "Run transactions + a query"
              :parameters {:body ::db-run}
              :handler #'run-handler}}]
-
 
     ["/public/*" (ring/create-resource-handler)]]
    {:exception pretty/exception

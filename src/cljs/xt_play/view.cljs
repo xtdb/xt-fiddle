@@ -1,5 +1,6 @@
 (ns xt-play.view
-  (:require ["@heroicons/react/24/outline" :refer [BookmarkIcon CheckCircleIcon QuestionMarkCircleIcon]]
+  (:require ["@heroicons/react/24/outline"
+             :refer [BookmarkIcon CheckCircleIcon QuestionMarkCircleIcon]]
             ["@heroicons/react/24/solid"
              :refer [ArrowUturnLeftIcon PencilIcon PlayIcon XMarkIcon]]
             [clojure.string :as str]
@@ -8,19 +9,22 @@
             [xt-play.components.dropdown :refer [dropdown]]
             [xt-play.components.editor :as editor]
             [xt-play.components.highlight :as hl]
+            [xt-play.config :as config]
             [xt-play.model.client :as model]
             [xt-play.model.run :as run]
             [xt-play.model.tx-batch :as tx-batch]))
 
-(defn language-dropdown [tx-type]
+;; Todo - pull out components to own ns
+
+(defn- language-dropdown [tx-type]
   [dropdown {:items model/items
              :selected tx-type
              :on-click #(rf/dispatch [:dropdown-selection (:value %)])
-             :label (get (model/value->label model/items) tx-type)}])
+             :label (get config/tx-types tx-type)}])
 
-(defn spinner [] [:div "Loading..."]) ;; todo spinners spin
+(defn- spinner [] [:div "Loading..."]) ;; todo spinners spin
 
-(defn display-error [{:keys [exception message data]}]
+(defn- display-error [{:keys [exception message data]}]
   [:div {:class "flex flex-col gap-2"}
    [:div {:class "bg-red-100 border-l-4 border-red-500 text-red-700 p-4"}
     [:p {:class "font-bold"} (str "Error: " exception)]
@@ -34,7 +38,7 @@
         "Data:"]
        [:p (pr-str data)]])]])
 
-(defn display-table [results tx-type]
+(defn- display-table [results tx-type]
   (when results
     [:table {:class "table-auto w-full"}
      [:thead
@@ -57,23 +61,23 @@
               [hl/code {:language "json"}
                (js/JSON.stringify (clj->js value))])])])]]))
 
-(defn title [& body]
+(defn- title [& body]
   (into [:h2 {:class "text-lg font-semibold"}]
         body))
 
-(defn button [opts & body]
+(defn- button [opts & body]
   (into [:button (merge {:class "bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded-sm"}
                         opts)]
         body))
 
-(defn run-button []
+(defn- run-button []
   [button {:class "bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded-sm"
            :on-click #(rf/dispatch [::run/run])}
    [:div {:class "flex flex-row gap-1 items-center"}
     "Run"
     [:> PlayIcon {:class "h-5 w-5"}]]])
 
-(defn copy-button []
+(defn- copy-button []
   (let [copy-tick (rf/subscribe [:copy-tick])]
     (fn []
       [:div {:class (str "p-2 flex flex-row gap-1 items-center select-none"
@@ -90,14 +94,14 @@
           "Copied!"
           [:> CheckCircleIcon {:class "h-5 w-5"}]])])))
 
-(def logo
+(def ^:private logo
   [:a {:href "/"}
    [:div {:class "flex flex-row items-center gap-1"}
     [:img {:class "h-8"
            :src "/public/images/xtdb-full-logo.svg"}]
     [title "Play"]]])
 
-(defn header [tx-type]
+(defn- header [tx-type]
   [:header {:class "sticky top-0 z-50 bg-gray-200 py-2 px-4"}
    [:div {:class "container mx-auto flex flex-col md:flex-row items-center gap-1"}
     [:div {:class "w-full flex flex-row items-center gap-4"}
@@ -106,37 +110,32 @@
       @(rf/subscribe [:version])]]
     [:div {:class "max-md:hidden flex-grow"}]
     [:div {:class "w-full flex flex-row items-center gap-1 md:justify-end"}
-     [:div {:class "md:hidden flex-grow"}]
      [language-dropdown tx-type]
+     [:div {:class "md:hidden flex-grow"}]
      [copy-button]
      [run-button]]]])
 
-(def beta-copy
-  (str "We are currently testing a new SQL framework for XTDB Play which utilises more of XTDB 2.0s powerful new features. "
-       "Feel free to stick arround and have a play, but if you want to return to safty, select a different mode from the dropdown"))
-
 (defn- beta-banner []
-  (let [expanded? (r/atom false)]
-    (fn []
-      [:footer {:class "sticky bottom-0 z-50 bg-red-200 py-2 px-4"}
-       [:div {:class "container text-red-900 mx-auto flex flex-col items-center gap-1 cursor-pointer"
-              :on-click #(swap! expanded? not)}
-        (if-not @expanded?
-          ;; todo, this can be nicer.
+  (when (:show-beta? config/config)
+    (let [expanded? (r/atom false)]
+      (fn []
+        [:footer {:class "sticky bottom-0 z-50 bg-red-200 py-2 px-4"}
+         [:div {:class "container text-red-900 mx-auto flex flex-col items-center gap-1 cursor-pointer"
+                :on-click #(swap! expanded? not)}
+          (if-not @expanded?
+            [:div {:class "flex items-center gap-1"}
+             "You are in beta mode."
+             [:> QuestionMarkCircleIcon {:class "h-5 w-5"}]]
+            [:p config/beta-copy])]]))))
 
-          [:div {:class "flex items-center gap-1"}
-           "You are in beta mode."
-           [:> QuestionMarkCircleIcon {:class "h-5 w-5"}]]
-          [:p beta-copy])]])))
-
-(defn reset-system-time-button [id]
+(defn- reset-system-time-button [id]
   [:> ArrowUturnLeftIcon
    {:class "h-5 w-5 cursor-pointer"
     :on-click #(rf/dispatch
                 [:fx [[:dispatch [::tx-batch/assoc id :system-time nil]]
                       [:dispatch [:update-url]]]])}])
 
-(defn input-system-time [id system-time]
+(defn- input-system-time [id system-time]
   ;; TODO: Show the picker when someone clicks the edit button
   ;;       https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/showPicker
   [:input {:type "date"
@@ -145,12 +144,12 @@
                                           [:dispatch [:update-url]]]])
            :max (-> (js/Date.) .toISOString (str/split #"T") first)}])
 
-(defn edit-system-time-button [id]
+(defn- edit-system-time-button [id]
   [:> PencilIcon {:className "h-5 w-5 cursor-pointer"
                   :on-click #(rf/dispatch [:fx [[:dispatch [::tx-batch/assoc id :system-time (js/Date. (.toDateString (js/Date.)))]]
                                                 [:dispatch [:update-url]]]])}])
 
-(defn single-transaction [{:keys [editor id]} {:keys [system-time txs]}]
+(defn- single-transaction [{:keys [editor id]} {:keys [system-time txs]}]
   [:div {:class "h-full flex flex-col"}
    (when system-time
      [:div {:class "flex flex-row justify-center items-center py-1 px-5 bg-gray-200"}
@@ -161,7 +160,7 @@
             :on-blur #(rf/dispatch [:fx [[:dispatch [::tx-batch/assoc id :txs %]]
                                            [:dispatch [:update-url]]]])}]])
 
-(defn multiple-transactions [{:keys [editor]} tx-batches]
+(defn- multiple-transactions [{:keys [editor]} tx-batches]
   [:<>
    (for [[id {:keys [system-time txs]}] tx-batches]
      ^{:key id}
@@ -183,7 +182,7 @@
                :on-blur #(rf/dispatch [:fx [[:dispatch [::tx-batch/assoc id :txs %]]
                                               [:dispatch [:update-url]]]])}]])])
 
-(defn transactions [{:keys [editor]}]
+(defn- transactions [{:keys [editor]}]
   [:div {:class "mx-4 md:mx-0 md:ml-4 md:flex-1 flex flex-col"}
    [:h2 "Transactions:"]
    ; NOTE: The min-h-0 somehow makes sure the editor doesn't
@@ -203,7 +202,7 @@
                                              [:dispatch [:update-url]]]])}
       "+"]]]])
 
-(defn query [{:keys [editor]}]
+(defn- query [{:keys [editor]}]
   [:div {:class "mx-4 md:mx-0 md:mr-4 md:flex-1 flex flex-col"}
    [:h2 "Query:"]
    [editor {:class "md:flex-grow h-full min-h-36 border"
@@ -215,7 +214,7 @@
 (def ^:private no-results-message "No results returned")
 (defn- empty-rows-message [results] (str (count results) " empty row(s) returned"))
 
-(defn results []
+(defn- results []
   (let [tx-type (rf/subscribe [:get-type])
         loading? (rf/subscribe [::run/loading?])
         results-or-failure (rf/subscribe [::run/results-or-failure])]

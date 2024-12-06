@@ -2,8 +2,6 @@
   (:require [re-frame.core :as rf]
             [xt-play.config :as config]))
 
-;; TODO: TESTS
-
 ;; Goals:
 ;; - Batches are in a consistent order for rendering
 ;; - Batches are accessed via a consistent key
