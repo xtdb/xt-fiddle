@@ -7,6 +7,7 @@
 
 ;; todo:
 ;; [ ] test unhappy paths
+;; [ ] test wider range of scenarios / formats
 ;; [ ] test to pipeline
 ;; [ ] assert format from client
 
@@ -127,4 +128,41 @@
                 "red"
                 #time/zoned-date-time "2023-09-01T00:00Z[UTC]"
                 #time/zoned-date-time "2024-01-08T00:00Z[UTC]"]]}
-             (h/run-handler (t-file "sql-multi-transaction"))))))
+             (h/run-handler (t-file "sql-multi-transaction")))))
+
+  (t/testing "Bob still likes fishing - don't determine columns based on the first row"
+    (t/is (= {:status 200,
+              :body
+              [["_id" "favorite_color" "name" "likes"]
+               [2 "red" "carol" nil]
+               [9 nil "bob" ["fishing" 3.14 {"nested" "data"}]]]}
+             (h/run-handler
+              (assoc-in
+               (t-file "sql-multi-transaction")
+               [:parameters :body :query]
+               "SELECT * FROM people"))))))
+
+(t/deftest beta-sql-says-carol-is-red-test
+  (t/testing "XTDB docs example for sql https://docs.xtdb.com/quickstart/sql-overview.html"
+    (t/is (= {:status 200,
+              :body
+              [[:name :favorite_color :_valid_from :_system_from]
+               ["carol"
+                "red"
+                #inst "2023-08-31T23:00:00.000000000-00:00"
+                #inst "2024-01-08T00:00:00.000000000-00:00"]]}
+             (h/run-handler (assoc-in
+                             (t-file "sql-multi-transaction")
+                             [:parameters :body :tx-type]
+                             "sql-beta")))))
+
+  (t/testing "Bob still likes fishing - don't determine columns based on the first row"
+    (t/is (= {:status 200,
+             :body
+             [[:_id :favorite_color :info :likes :name]
+              [2 "red" nil nil "carol"]
+              [9 nil nil ["fishing" 3.14 {:nested "data"}] "bob"]]}
+             (h/run-handler
+              (->  (t-file "sql-multi-transaction")
+                   (assoc-in [:parameters :body :query] "SELECT * FROM people")
+                   (assoc-in [:parameters :body :tx-type] "sql-beta")))))))
