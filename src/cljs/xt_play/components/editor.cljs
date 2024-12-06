@@ -85,3 +85,9 @@
            :extensions sql-extensions
            :on-change on-change
            :class my-class}])
+
+(defn default-editor [tx-type]
+  (case tx-type
+    :xtql clj-editor
+    :sql sql-editor
+    sql-editor))

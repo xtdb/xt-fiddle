@@ -10,7 +10,6 @@
     [:meta {:name "description" :content ""}]
     [:link {:rel "stylesheet" :href "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css"}]
     [:link {:rel "stylesheet" :type "text/css" :href "/public/css/main.css"}]
-    [:link {:rel "stylesheet" :href "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"}]
     [:script {:src "https://cdn.tailwindcss.com"}]
     [:script {:async true
               :defer true
