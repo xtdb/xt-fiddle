@@ -1,5 +1,6 @@
 (ns xt-play.transactions
   (:require [clojure.string :as str]
+            [clojure.data.json :as json]
             [clojure.tools.logging :as log]
             [next.jdbc :as jdbc]
             [next.jdbc.result-set :as jdbc-res]
@@ -49,6 +50,21 @@
     (log/info tx-type "XTDB query response:" res)
     (util/map-results->rows res)))
 
+(defn- PGobject->clj [v]
+  (if (= org.postgresql.util.PGobject (type v))
+    (json/read-str (.getValue v) :key-fn keyword)
+    v))
+
+(defn- parse-result [result]
+  ;; TODO - should we be doing this?
+  ;; Are we expecting a PGobject back from xt?
+  ;; Potentially a JDBC configuration?
+  ;; This will only pick up top level objects
+  (mapv
+   (fn [row]
+     (mapv PGobject->clj row))
+   result))
+
 (defn- run!-with-jdbc-conn [tx-batches query]
   (with-open [conn (jdbc/get-connection config/db)]
     (doseq [tx (prepare-statements tx-batches)
@@ -58,7 +74,7 @@
     (log/info "beta running query:" query)
     (let [res (jdbc/execute! conn [query] {:builder-fn jdbc-res/as-arrays})]
       (log/info "beta query resoponse" res)
-      res)))
+      (parse-result res))))
 
 (defn run!!
   "Given transaction batches, a query and the type of transaction to
