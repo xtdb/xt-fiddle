@@ -1,25 +1,10 @@
 (ns xt-play.transactions
-  (:require [clojure.edn :as edn]
-            [clojure.spec.alpha :as s]
-            [clojure.string :as str]
+  (:require [clojure.string :as str]
             [clojure.tools.logging :as log]
-            [hiccup.page :as h]
-            [integrant.core :as ig]
-            [muuntaja.core :as m]
             [next.jdbc :as jdbc]
             [next.jdbc.result-set :as jdbc-res]
-            [reitit.coercion.spec :as rcs]
-            [reitit.dev.pretty :as pretty]
-            [reitit.ring :as ring]
-            [reitit.ring.coercion :as rrc]
-            [reitit.ring.middleware.exception :as exception]
-            [reitit.ring.middleware.muuntaja :as muuntaja]
-            [ring.middleware.cors :refer [wrap-cors]]
-            [ring.middleware.params :as params]
-            [ring.util.response :as response]
-            [xt-play.util :as util]
-            [xt-play.view :as view]
             [xt-play.config :as config]
+            [xt-play.util :as util]
             [xtdb.api :as xt]
             [xtdb.node :as xtn]))
 
@@ -55,11 +40,9 @@
             results (xt/q node '(from :xt/txs [{:xt/id $tx-id} xt/error])
                           {:args {:tx-id (:tx-id tx)}})]
         ;; If any transaction fails, throw the error
-        ;; todo - send the error back to the server?
         (log/info tx-type "batch complete:" tx ", results:" results)
         (when-let [error (-> results first :xt/error)]
           (throw error)))))
-  ;; Run query
   (log/info tx-type "running query:" query)
   (let [res (xt/q node query (when (string? query)
                                {:key-fn :snake-case-string}))]
@@ -77,7 +60,11 @@
       (log/info "beta query resoponse" res)
       res)))
 
-(defn run!! [{:keys [tx-batches query tx-type]}]
+(defn run!!
+  "Given transaction batches, a query and the type of transaction to
+  use, will run transaction batches and queries sequentially,
+  returning the last query response."
+  [{:keys [tx-batches query tx-type]}]
   (let [query (if (= "xtql" tx-type) (util/read-edn query) query)]
     (try
       (with-open [node (xtn/start-node {})]
@@ -87,13 +74,3 @@
       (catch Exception e
         (log/warn :submit-error {:e e})
         (throw e)))))
-
-(comment
-  (with-open [node (xtn/start-node {})]
-    (doseq [st [#inst "2022" #inst "2021"]]
-      (let [tx (xt/submit-tx node [] {:system-time st})
-            results (xt/q node '(from :xt/txs [{:xt/id $tx-id} xt/error])
-                          {:basis {:at-tx tx}
-                           :args {:tx-id (:tx-id tx)}})]
-        (when-let [error (-> results first :xt/error)]
-          (throw (ex-info "Transaction error" {:error error})))))))

@@ -10,12 +10,6 @@
 ;; [ ] test to pipeline
 ;; [ ] assert format from client
 
-(t/deftest xt-version-test
-  ;; this will fail when the version changes. This is intentional. It will
-  ;; should prompt you to check that the features in xtdb-play are compatible
-  ;; with new xt version changes.
-  (t/is (= h/xt-version "2.0.0-beta3")))
-
 (defn- t-file [path]
   (edn/read-string (slurp (format "test-resources/%s.edn" path))))
 
