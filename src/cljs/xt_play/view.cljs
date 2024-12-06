@@ -1,101 +1,25 @@
-(ns xt-play.client
-  (:require [xt-play.editor :as editor]
-            [xt-play.run :as run]
-            [xt-play.query-params :as query-params]
-            [xt-play.clipboard :as clipboard]
-            [xt-play.href :as href]
-            [reagent.core :as r]
-            [xt-play.highlight :as hl]
-            [xt-play.tx-batch :as tx-batch]
-            [xt-play.query :as query]
-            [xt-play.dropdown :refer [dropdown]]
+(ns xt-play.view
+  (:require ["@heroicons/react/24/outline" :refer [BookmarkIcon CheckCircleIcon]]
+            ["@heroicons/react/24/solid"
+             :refer [ArrowUturnLeftIcon PencilIcon PlayIcon XMarkIcon]]
             [clojure.string :as str]
-            [lambdaisland.glogi :as log]
             [re-frame.core :as rf]
-            ["@heroicons/react/24/solid" :refer [ArrowUturnLeftIcon
-                                                 PencilIcon
-                                                 PlayIcon
-                                                 XMarkIcon]]
-            ["@heroicons/react/24/outline" :refer [BookmarkIcon
-                                                   CheckCircleIcon]]))
-
-(rf/reg-event-db
-  :hide-copy-tick
-  (fn [db _]
-    (dissoc db :copy-tick)))
-
-(rf/reg-event-fx
-  :copy-url
-  [(rf/inject-cofx ::href/get)]
-  (fn [{:keys [db href]} _]
-    {::clipboard/set {:text href}
-     :db (assoc db :copy-tick true)
-     :dispatch-later {:ms 800 :dispatch [:hide-copy-tick]}}))
-
-(rf/reg-sub
-  :copy-tick
-  :-> :copy-tick)
-
-(rf/reg-event-fx
-  :update-url
-  (fn [{:keys [db]} _]
-    {::query-params/set {:version (:version db)
-                         :type (name (:type db))
-                         :txs (tx-batch/param-encode (tx-batch/list db))
-                         :query (js/btoa (:query db))}}))
-
-(rf/reg-event-fx
-  :dropdown-selection
-  (fn [{:keys [db]} [_ new-type]]
-    {:db (-> db
-             (assoc :type new-type)
-             (assoc :query (query/default new-type)))
-     :fx [[:dispatch [::tx-batch/init [(tx-batch/default new-type)]]]
-          [:dispatch [:update-url]]]}))
-
-(rf/reg-event-db
-  :set-query
-  (fn [db [_ query]]
-    (assoc db :query query)))
-
-(rf/reg-event-fx
-  :fx
-  (fn [_ [_ effects]]
-    {:fx effects}))
-
-(rf/reg-sub
-  :get-type
-  :-> :type)
-
-(rf/reg-sub
-  :query
-  :-> :query)
-
-(rf/reg-sub
-  :version
-  :-> :version)
-
-(defn- value->label [items]
-  (partial
-   (apply merge
-          (map (fn [{:keys [value label]}]
-                 {value label})
-               items))))
-
-(def items
-  [{:value :sql :label "SQL"}
-   {:value :xtql :label "XTQL"}
-   {:value :sql-beta :label "Beta"}])
+            [reagent.core :as r]
+            [xt-play.components.dropdown :refer [dropdown]]
+            [xt-play.components.editor :as editor]
+            [xt-play.components.highlight :as hl]
+            [xt-play.model.client :as model]
+            [xt-play.model.run :as run]
+            [xt-play.model.tx-batch :as tx-batch]))
 
 (defn language-dropdown []
   (let [tx-type @(rf/subscribe [:get-type])]
-    [dropdown {:items items
+    [dropdown {:items model/items
                :selected tx-type
                :on-click #(rf/dispatch [:dropdown-selection (:value %)])
-               :label (get (value->label items) tx-type)}]))
+               :label (get (model/value->label model/items) tx-type)}]))
 
-(defn spinner []
-  [:div "Loading..."])
+(defn spinner [] [:div "Loading..."])
 
 (defn display-error [{:keys [exception message data]}]
   [:div {:class "flex flex-col gap-2"}
@@ -198,14 +122,16 @@
               :on-click #(swap! expanded? not)}
         (if-not @expanded?
           ;; todo, this can be nicer.
-          [:p {:class "fa-regular fa-question-circle"} 
+          [:p {:class "fa-regular fa-question-circle"}
            " You are in beta mode. Click here to find out more."]
           [:p beta-copy])]])))
 
 (defn reset-system-time-button [id]
-  [:> ArrowUturnLeftIcon {:class "h-5 w-5 cursor-pointer"
-                          :on-click #(rf/dispatch [:fx [[:dispatch [::tx-batch/assoc id :system-time nil]]
-                                                        [:dispatch [:update-url]]]])}])
+  [:> ArrowUturnLeftIcon
+   {:class "h-5 w-5 cursor-pointer"
+    :on-click #(rf/dispatch
+                [:fx [[:dispatch [::tx-batch/assoc id :system-time nil]]
+                      [:dispatch [:update-url]]]])}])
 
 (defn input-system-time [id system-time]
   ;; TODO: Show the picker when someone clicks the edit button

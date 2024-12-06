@@ -1,4 +1,4 @@
-(ns xt-play.dropdown
+(ns xt-play.components.dropdown
   (:require [reagent.core :as r]))
 
 (defn dropdown [{:keys [label selected items on-click]}]

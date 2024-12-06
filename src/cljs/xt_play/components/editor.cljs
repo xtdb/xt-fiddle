@@ -1,4 +1,4 @@
-(ns xt-play.editor
+(ns xt-play.components.editor
   (:require ["@codemirror/autocomplete" :refer [autocompletion]]
             ["@codemirror/commands" :refer [defaultKeymap history historyKeymap indentWithTab]]
             ["@codemirror/language" :refer [foldGutter syntaxHighlighting defaultHighlightStyle]]

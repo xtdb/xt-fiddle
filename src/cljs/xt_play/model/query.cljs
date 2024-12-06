@@ -1,4 +1,4 @@
-(ns xt-play.query)
+(ns xt-play.model.query)
 
 ;; >> API
 

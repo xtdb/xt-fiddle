@@ -6,6 +6,7 @@
             [xtdb.api :as xt]))
 
 ;; todo:
+;; [ ] test unhappy paths
 ;; [ ] test to pipeline
 ;; [ ] assert format from client
 
