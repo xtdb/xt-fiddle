@@ -1,17 +1,17 @@
-(ns xt-play.run
-  (:require [xt-play.tx-batch :as tx-batch]
-            [clojure.string :as str]
-            [re-frame.core :as rf]
-            [ajax.core :as ajax]))
-
-(defn- to-iso-str [d] (when d (.toISOString d)))
+(ns xt-play.model.run
+  (:require
+   [ajax.core :as ajax]
+   [clojure.string :as str]
+   [re-frame.core :as rf]
+   [xt-play.util :as util]
+   [xt-play.model.tx-batch :as tx-batch]))
 
 (defn- db-run-opts [{:keys [query type] :as db}]
   (let [params {:tx-type type
                 :query query
-                :tx-batches
-                (->> (tx-batch/list db)
-                     (map #(update % :system-time to-iso-str)))}]
+                :tx-batches (map #(update % :system-time
+                                          util/format-system-time)
+                                 (tx-batch/batch-list db))}]
     {:method :post
      :uri "/db-run"
      :params params
@@ -38,26 +38,30 @@
         (assoc ::response? true)
         (assoc ::results results))))
 
-(rf/reg-event-db ::request-failure
+(rf/reg-event-db
+ ::request-failure
   (fn [db [_ {:keys [response] :as _failure-map}]]
     (-> db
         (dissoc ::loading?)
         (assoc ::failure response))))
 
-(rf/reg-sub ::results-or-failure
-  :-> #(let [results (select-keys % [::results ::failure ::response?])]
-         (when-not (empty? results)
-           results)))
+(rf/reg-sub
+ ::results-or-failure
+ (fn [db]
+   (let [results (select-keys db [::results ::failure ::response?])]
+     (when-not (empty? results)
+       results))))
 
-(rf/reg-sub ::results?
+(rf/reg-sub
+ ::results?
   :<- [::results-or-failure]
   :-> boolean)
 
-(rf/reg-sub ::loading?
+(rf/reg-sub
+ ::loading?
   :-> ::loading?)
 
 (comment
   (require '[re-frame.db :as db])
   (def db @db/app-db)
   (keys db))
-
