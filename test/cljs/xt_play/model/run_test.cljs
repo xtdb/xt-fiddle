@@ -1,4 +1,4 @@
-(ns xt-play.model.run
+(ns xt-play.model.run-test
   (:require
    [cljs.test :as t]
    [ajax.core :as ajax]

@@ -17,6 +17,7 @@
 ;; Todo
 ;; - pull out components to own ns
 ;; - standardize update / change events
+;; - add a save btn / saving icon when updating url
 
 (defn- language-dropdown [tx-type]
   [dropdown {:items model/items

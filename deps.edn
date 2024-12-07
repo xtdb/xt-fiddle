@@ -59,8 +59,9 @@
               "-Dio.netty.tryReflectionSetAccessible=true"]}
 
   :test
-  {:extra-paths ["test"]
-   :extra-deps  {lambdaisland/kaocha {:mvn/version "1.0.632"}}}
+  {:extra-paths ["test/clj"]
+   :extra-deps  {lambdaisland/kaocha {:mvn/version "1.91.1392"}}
+   :main-opts ["-m" "kaocha.runner"]}
 
   :build {:extra-deps {io.github.clojure/tools.build {:git/tag "v0.8.4" :git/sha "8c3cd69"}}
           :ns-default build}}

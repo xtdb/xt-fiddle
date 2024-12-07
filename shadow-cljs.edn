@@ -1,4 +1,5 @@
 {:deps {:aliases [:cljs :dev]}
+ :source-paths ["src/cljs" "test/cljs"]
 
  ;; TODO problems with clojure-mode
  ;; :source-paths ["src"]
@@ -11,31 +12,36 @@
  :nrepl {:middleware [cider.nrepl/cider-middleware
                       refactor-nrepl.middleware/wrap-refactor]}
 
- :dev-http {8020 "resources/public"
-            8021 "out/test"}
+ :dev-http {8020 "resources/public"}
 
- :builds
- {:test
-  {:target :browser-test
-   :test-dir "out/test"}
-  :app
-  {:target     :browser
+ :builds {:test
+          #_{:target :browser
+           :output-dir "public/test"
+           :entry "xt-play.test-runner"
+           :devtools {:after-load "xt-play.test-runner/run-tests"}}
 
-   :modules {:app {:entries [xt-play.app]}}
-                   ;; :preloads [devtools.preload]
+          {:target :browser
+           :output-dir "resources/public/js/test"
+           :asset-path "/public/js/test/"
+           :modules {:test {:entries [xt-play.test-runner]}}
+           ;;:devtools {:http-root "resources/public", :http-port 8080}
+           }
 
-
-   :output-dir "resources/public/js/compiled"
-   :asset-path "/public/js/compiled"
-   :dev        {:compiler-options {:devcards true}}
-   :release    {:compiler-options {:warnings-as-errors true
-                                   :warnings {:redef-in-file false}
-                                   :closure-defines {goog.DEBUG false
-                                                     goog.debug.LOGGING_ENABLED true}}}
-   :js-options {:resolve
-                {"react"     {:export-globals ["React"]}
-                 "react-dom" {:export-globals ["ReactDOM"]}}}
-   :devtools   {:repl-pprint true}}}
+          :app
+          {:target     :browser
+           :modules {:app {:entries [xt-play.app]}}
+           ;; :preloads [devtools.preload]
+           :output-dir "resources/public/js/compiled"
+           :asset-path "/public/js/compiled"
+           :dev        {:compiler-options {:devcards true}}
+           :release    {:compiler-options {:warnings-as-errors true
+                                           :warnings {:redef-in-file false}
+                                           :closure-defines {goog.DEBUG false
+                                                             goog.debug.LOGGING_ENABLED true}}}
+           :js-options {:resolve
+                        {"react"     {:export-globals ["React"]}
+                         "react-dom" {:export-globals ["ReactDOM"]}}}
+           :devtools   {:repl-pprint true}}}
 
  ;; TODO understand
  :cache-blockers #{}}
