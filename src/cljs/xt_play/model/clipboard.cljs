@@ -1,4 +1,4 @@
-(ns xt-play.clipboard
+(ns xt-play.model.clipboard
   (:require [re-frame.core :as rf]))
 
 (rf/reg-fx ::set

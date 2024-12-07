@@ -1,20 +1,27 @@
 (ns xt-play.app
-  (:require [lambdaisland.glogi :as log]
+  (:require [day8.re-frame.http-fx] ;; don't delete
+            [lambdaisland.glogi :as log]
             [lambdaisland.glogi.console :as glogi-console]
             [re-frame.core :as rf]
             [reagent.dom :as r-dom]
-            [xt-play.query-params :as query-params]
-            [xt-play.highlight :as hl]
-            [xt-play.tx-batch :as tx-batch]
-            [xt-play.query :as query]
-            [xt-play.client :as client]
-            [day8.re-frame.http-fx]))
+            [xt-play.components.highlight :as hl]
+            [xt-play.model.query :as query]
+            [xt-play.model.query-params :as query-params]
+            [xt-play.model.tx-batch :as tx-batch]
+            [xt-play.view :as view]))
 
 (glogi-console/install!)
 
 (log/set-levels
  {:glogi/root   :info})    ;; Set a root logger level, this will be inherited by all loggers
-  ;; 'my.app.thing :trace  ;; Some namespaces you might want detailed logging
+
+;; 'my.app.thing :trace  ;; Some namespaces you might want detailed logging
+
+;; TODO: Special case existing txs
+(defn- param-decode [s]
+  (let [txs (-> s js/atob js/JSON.parse (js->clj :keywordize-keys true))]
+    (->> txs
+         (map #(update % :system-time (fn [d] (when d (js/Date. d))))))))
 
 (rf/reg-event-fx
   ::init
@@ -29,14 +36,14 @@
                      (query/default type))}
        :dispatch [::tx-batch/init
                   (if txs
-                    (tx-batch/param-decode txs)
+                    (param-decode txs)
                     [(tx-batch/default type)])]})))
 
 (defn ^:dev/after-load start! []
   (log/info :start "start")
   (hl/setup)
   (rf/dispatch-sync [::init js/xt_version])
-  (r-dom/render [client/app] (js/document.getElementById "app")))
+  (r-dom/render [view/app] (js/document.getElementById "app")))
 
 (defn ^:export init []
   ;; init is called ONCE when the page loads

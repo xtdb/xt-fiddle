@@ -11,10 +11,14 @@
  :nrepl {:middleware [cider.nrepl/cider-middleware
                       refactor-nrepl.middleware/wrap-refactor]}
 
- :dev-http {8020 "resources/public"}
+ :dev-http {8020 "resources/public"
+            8021 "out/test"}
 
  :builds
- {:app
+ {:test
+  {:target :browser-test
+   :test-dir "out/test"}
+  :app
   {:target     :browser
 
    :modules {:app {:entries [xt-play.app]}}

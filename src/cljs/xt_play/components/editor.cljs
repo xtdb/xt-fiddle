@@ -1,4 +1,4 @@
-(ns xt-play.editor
+(ns xt-play.components.editor
   (:require ["@codemirror/autocomplete" :refer [autocompletion]]
             ["@codemirror/commands" :refer [defaultKeymap history historyKeymap indentWithTab]]
             ["@codemirror/language" :refer [foldGutter syntaxHighlighting defaultHighlightStyle]]
@@ -85,3 +85,9 @@
            :extensions sql-extensions
            :on-change on-change
            :class my-class}])
+
+(defn default-editor [tx-type]
+  (case tx-type
+    :xtql clj-editor
+    :sql sql-editor
+    sql-editor))

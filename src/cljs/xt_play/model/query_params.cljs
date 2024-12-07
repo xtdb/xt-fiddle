@@ -1,15 +1,17 @@
-(ns xt-play.query-params
+(ns xt-play.model.query-params
   (:require [re-frame.core :as rf]))
 
 (defn get-query-params []
   (->> (js/URLSearchParams. (.-search js/window.location))
-       (map js->clj)
-       (map (fn [[k v]] [(keyword k) v]))
+       (map (fn [param]
+              (let [[k v] (js->clj param)]
+                {(keyword k) v})))
        (into {})))
 
-(rf/reg-cofx ::get
-  (fn [cofx _]
-    (assoc cofx :query-params (get-query-params))))
+(rf/reg-cofx
+ ::get
+ (fn [cofx _]
+   (assoc cofx :query-params (get-query-params))))
 
 (defn ->query-string [params]
   (let [search-params (js/URLSearchParams.)]
