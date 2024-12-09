@@ -10,6 +10,10 @@
 (defn browse [port]
   (browse/browse-url (str "http://localhost:" port)))
 
+(defn browse! []
+  (browse 8000)
+  (browse 9630))
+
 (defn watch-deps!
   []
   (watch-deps/start! {:aliases [:dev :test]}))
@@ -17,6 +21,11 @@
 (igr/set-prep! #(ig/prep main/system))
 
 (def go! go)
+
+(defn go!! []
+  (go!)
+  (watch-deps!)
+  (browse!))
 
 (comment
   (repl/set-refresh-dirs (io/file "src") (io/file "dev"))

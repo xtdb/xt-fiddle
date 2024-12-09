@@ -54,7 +54,7 @@ M-x cider-repl-set-ns user
 Switch to namespace: `user`
 
 ```
-user> (watch-deps!) (go) (browse 8000)
+user> (watch-deps!) (go!) (browse!)
 
 ```
 
@@ -109,6 +109,21 @@ output:
 ```
 
 ---
+
+</details>
+
+### Cljs development errors
+
+<details>
+<summary>
+shadow-cljs - Stale Output! Your loaded JS was not produced by the running shadow-cljs instance. Is the watch for this build running?
+</summary>
+
+If the watch did not start properly, you can manually start it by navigating to [http://localhost:9630/builds](http://localhost:9630/builds) and selecting "Watch".
+Return to the running XTDB Play and refresh the page.
+Hot reloads should now be working.
+
+If this doesn't work, try a hard refresh or clearing site data.
 
 </details>
 

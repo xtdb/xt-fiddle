@@ -1,9 +1,7 @@
 (ns xt-play.handler
-  (:require [integrant.core :as ig]
-            [clojure.edn :as edn]
-            [clojure.instant :refer [read-instant-date]]
-            [clojure.spec.alpha :as s]
+  (:require [clojure.spec.alpha :as s]
             [clojure.tools.logging :as log]
+            [integrant.core :as ig]
             [muuntaja.core :as m]
             [reitit.coercion.spec :as rcs]
             [reitit.dev.pretty :as pretty]
@@ -11,18 +9,40 @@
             [reitit.ring.coercion :as rrc]
             [reitit.ring.middleware.exception :as exception]
             [reitit.ring.middleware.muuntaja :as muuntaja]
+            [ring.middleware.cors :refer [wrap-cors]]
             [ring.middleware.params :as params]
             [ring.util.response :as response]
-            [ring.middleware.cors :refer [wrap-cors]]
-            [xtdb.api :as xt]
-            [xtdb.node :as xtn]
-            [hiccup.page :as h]))
+            [xt-play.transactions :as txs]
+            [xt-play.view :as view]))
+
+;; TODO:
+;; [x] Send tx data back asis - data manipulation server side
+;; [x] Beta is an option in the type
+;; [x] Handle multi tx on pgwire
+;; [x] Handle system time on pgwire
+;; [x] Manipulate response data server side
+;; [x] remove btn
+;; [x] banner
+;; [x] logging
+;; [x] handle todos
+;; [x] Tests!
+;; [x] Refactor - split into more meaningful files
+;; [x] - add config, request, response, xt ns
+;; [x] - split out ui to components
+;; [x] - Better management on subs
+;; [x] cljs tests
+;; [] Handle queries in tx?
+;; [] Display errors in result box
+;; [] automated test runners / pipelines
+;; [] extract common tailwind classes, e.g. icon sizes, to standardize
 
 (s/def ::system-time (s/nilable string?))
 (s/def ::txs string?)
 (s/def ::tx-batches (s/coll-of (s/keys :req-un [::system-time ::txs])))
 (s/def ::query string?)
+(s/def ::tx-type #{"sql-beta" "xtql" "sql"})
 (s/def ::db-run (s/keys :req-un [::tx-batches ::query]))
+(s/def ::beta-db-run (s/keys :req-un [::tx-batches ::query ::tx-type]))
 
 (defn- handle-client-error [ex _]
   {:status 400
@@ -45,85 +65,40 @@
      clojure.lang.ExceptionInfo handle-client-error
      ::exception/default handle-other-error})))
 
-(def xt-version
-  (-> (slurp "deps.edn")
-      (edn/read-string)
-      (get-in [:deps 'com.xtdb/xtdb-core :mvn/version])))
-(assert (string? xt-version) "xt-version not present")
-
-(def index
-  (h/html5
-   [:head
-    [:meta {:charset "utf-8"}]
-    [:meta {:name "viewport" :content "width=device-width, initial-scale=1"}]
-    [:meta {:name "description" :content ""}]
-    [:link {:rel "stylesheet" :href "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css"}]
-    [:link {:rel "stylesheet" :type "text/css" :href "/public/css/main.css"}]
-    [:script {:src "https://cdn.tailwindcss.com"}]
-    [:script {:async true
-              :defer true
-              :data-website-id "aabeabcb-ad76-47a4-9b4b-bef3fdc39af4"
-              :src "https://bunseki.juxt.pro/umami.js"}]
-    [:title "XTDB Play"]]
-   [:body
-    [:div {:id "app"}]
-    [:script {:type "text/javascript" :src "/public/js/compiled/app.js"}]
-    [:script {:type "text/javascript"}
-     (str "var xt_version = '" xt-version "';")]
-    [:script {:type "text/javascript"}
-     "xt_play.app.init()"]]))
-
-
-(comment
-  (with-open [node (xtn/start-node {})]
-    (doseq [st [#inst "2022" #inst "2021"]]
-      (let [tx (xt/submit-tx node [] {:system-time st})
-            results (xt/q node '(from :xt/txs [{:xt/id $tx-id} xt/error])
-                          {:basis {:at-tx tx}
-                           :args {:tx-id (:tx-id tx)}})]
-        (when-let [error (-> results first :xt/error)]
-          (throw (ex-info "Transaction error" {:error error})))))))
-
-(defn run-handler [request]
+(defn run-handler [{{body :body} :parameters :as request}]
   (log/debug "run-handler" request)
-  (let [{:keys [tx-batches query]} (get-in request [:parameters :body])
-        ;; TODO: Filter for only the readers required?
-        read-edn (partial edn/read-string {:readers *data-readers*})
-        tx-batches (->> tx-batches
-                        (map #(update % :system-time (fn [s] (when s (read-instant-date s)))))
-                        (map #(update % :txs read-edn)))
-        query (read-edn query)]
-    (log/info :db-run {:tx-batches tx-batches :query query})
-    (try
-      (with-open [node (xtn/start-node {})]
-        ;; Run transactions
-        (doseq [{:keys [system-time txs]} tx-batches]
-          (let [tx (xt/submit-tx node txs {:system-time system-time})
-                results (xt/q node '(from :xt/txs [{:xt/id $tx-id} xt/error])
-                              {:args {:tx-id (:tx-id tx)}})]
-            ;; If any transaction fails, throw the error
-            (when-let [error (-> results first :xt/error)]
-              (throw error))))
-        ;; Run query
-        (let [res (xt/q node query (when (string? query)
-                                     {:key-fn :snake-case-string}))]
-          {:status 200
-           :body res}))
-      (catch Exception e
-        (log/warn :submit-error {:e e})
-        (throw e)))))
+  (log/info :db-run body)
+  (if-let [result (txs/run!! body)]
+    {:status 200
+     :body result}
+    {:status 400}))
+
+(defn docs-run-handler [{{body :body} :parameters :as request}]
+  (log/debug "docs-run-handler" request)
+  (log/info :docs-db-run body)
+  (if-let [result (txs/docs-run!! body)]
+    {:status 200
+     :body result}
+    {:status 400}))
 
 (def routes
   (ring/router
    [["/"
      {:get {:summary "Fetch main page"
             :handler (fn [_request]
-                       (-> (response/response index)
+                       (-> (response/response view/index)
                            (response/content-type "text/html")))}}]
 
-    ["/db-run"
+    ["/db-run" ;; if the contract for this changes, it'll break the docs, so
+     ;; either docs need to change, or needs to remain backward
+     ;; compatible
      {:post {:summary "Run transactions + a query"
              :parameters {:body ::db-run}
+             :handler #'docs-run-handler}}]
+
+    ["/beta-db-run"
+     {:post {:summary "Run transactions + a query"
+             :parameters {:body ::beta-db-run}
              :handler #'run-handler}}]
 
     ["/public/*" (ring/create-resource-handler)]]

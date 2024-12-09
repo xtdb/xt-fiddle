@@ -1,4 +1,4 @@
-(ns xt-play.editor
+(ns xt-play.components.editor
   (:require ["@codemirror/autocomplete" :refer [autocompletion]]
             ["@codemirror/commands" :refer [defaultKeymap history historyKeymap indentWithTab]]
             ["@codemirror/language" :refer [foldGutter syntaxHighlighting defaultHighlightStyle]]
@@ -66,22 +66,23 @@
                                              "xt$system_from" "xt$system_to"]}
                 :upperCaseKeywords true})])
 
-(defn editor [{:keys [source extensions on-change] my-class :class}]
+(defn editor [{:keys [source extensions] my-class :class :as opts}]
   [:div {:class my-class}
-    [:> CodeMirror {:value source
-                    :extensions extensions
-                    :basicSetup false
-                    :className "h-full"
-                    :on-change on-change}]])
+    [:> CodeMirror (merge
+                    {:value source
+                     :extensions extensions
+                     :basicSetup false
+                     :className "h-full"}
+                    (select-keys opts [:on-change :on-blur :on-focus]))]])
 
-(defn clj-editor [{:keys [source on-change] my-class :class}]
-  [editor {:source source
-           :extensions clj-extensions
-           :on-change on-change
-           :class my-class}])
+(defn clj-editor [opts]
+  [editor (merge opts {:extensions clj-extensions})])
 
-(defn sql-editor [{:keys [source on-change] my-class :class}]
-  [editor {:source source
-           :extensions sql-extensions
-           :on-change on-change
-           :class my-class}])
+(defn sql-editor [opts]
+  [editor (merge opts {:extensions sql-extensions})])
+
+(defn default-editor [tx-type]
+  (case tx-type
+    :xtql clj-editor
+    :sql sql-editor
+    sql-editor))
