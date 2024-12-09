@@ -11,6 +11,7 @@
             [xt-play.components.highlight :as hl]
             [xt-play.config :as config]
             [xt-play.model.client :as model]
+            [xt-play.model.interval :as i]
             [xt-play.model.run :as run]
             [xt-play.model.tx-batch :as tx-batch]))
 
@@ -27,10 +28,13 @@
 
 (defn- editor-update-opts [id source]
   {:source source
+   :on-focus #(rf/dispatch [::i/start-editing])
    :on-change #(rf/dispatch (if (= :query id)
                               [:set-query %]
                               [::tx-batch/assoc id :txs %]))
-   :on-blur #(rf/dispatch [:update-url])})
+   :on-blur #(do
+               (rf/dispatch [:update-url])
+               (rf/dispatch [::i/stop-editing]))})
 
 (defn- display-error [{:keys [exception message data]}]
   [:div {:class "flex flex-col gap-2"}
@@ -55,19 +59,21 @@
          ^{:key label}
          [:th {:class "text-left p-4"} label])]]
      [:tbody
-      (for [[i row] (map-indexed vector (rest results))]
-        ^{:key (str "row-" i)}
-        [:tr {:class "border-b"}
-         (for [[ii value] (map-indexed vector row)]
-           ^{:key (str "row-" i " col-" ii)}
-           [:td {:class "text-left p-4"}
-            (case @tx-type
-              :xtql
-              [hl/code {:language "clojure"}
-               (pr-str value)]
-              ;; default
-              [hl/code {:language "json"}
-               (js/JSON.stringify (clj->js value))])])])]]))
+      (doall
+       (for [[i row] (map-indexed vector (rest results))]
+         ^{:key (str "row-" i)}
+         [:tr {:class "border-b"}
+          (doall
+           (for [[ii value] (map-indexed vector row)]
+             ^{:key (str "row-" i " col-" ii)}
+             [:td {:class "text-left p-4"}
+              (case @tx-type
+                :xtql
+                [hl/code {:language "clojure"}
+                 (pr-str value)]
+                ;; default
+                [hl/code {:language "json"}
+                 (js/JSON.stringify (clj->js value))])]))]))]]))
 
 (defn- title [& body]
   (into [:h2 {:class "text-lg font-semibold"}]
