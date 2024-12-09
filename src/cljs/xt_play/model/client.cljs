@@ -67,6 +67,9 @@
   :-> :version)
 
 (def items
-  (mapv (fn [[v l]]
-          {:value v, :label l})
-        config/tx-types))
+  (vec
+   (keep (fn [tx-type]
+           (when (or (:show-beta? config/config)
+                     (not (:beta? tx-type)))
+             (select-keys tx-type [:value :label])))
+         (vals config/tx-types))))

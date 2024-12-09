@@ -22,7 +22,7 @@
   [dropdown {:items model/items
              :selected tx-type
              :on-click #(rf/dispatch [:dropdown-selection (:value %)])
-             :label (get config/tx-types tx-type)}])
+             :label (get-in config/tx-types [tx-type :label])}])
 
 (defn- spinner [] [:div "Loading..."]) ;; todo spinners spin
 
@@ -135,6 +135,10 @@
      [copy-button]
      [run-button]]]])
 
+(def beta-copy
+  (str "We are currently testing a new SQL framework for XTDB Play which utilises more of XTDB 2.0s powerful new features. "
+       "Feel free to stick arround and have a play, but if you want to return to safty, select a different mode from the dropdown"))
+
 (defn- beta-banner []
   (when (:show-beta? config/config)
     (let [expanded? (r/atom false)]
@@ -146,7 +150,7 @@
             [:div {:class "flex items-center gap-1"}
              "You are in beta mode."
              [:> QuestionMarkCircleIcon {:class "h-5 w-5"}]]
-            [:p config/beta-copy])]]))))
+            [:p beta-copy])]]))))
 
 (defn- reset-system-time-button [id]
   [:> ArrowUturnLeftIcon
