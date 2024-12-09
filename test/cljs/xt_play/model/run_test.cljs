@@ -1,10 +1,6 @@
-(ns xt-play.model.run
+(ns xt-play.model.run-test
   (:require
    [cljs.test :as t]
-   [ajax.core :as ajax]
-   [clojure.string :as str]
-   [re-frame.core :as rf]
-   [xt-play.util :as util]
    [xt-play.model.run :as model]
    [xt-play.model.tx-batch :as batch]))
 
@@ -30,13 +26,13 @@
 
     (t/testing "app-db is in expected state"
       (t/is (= (-> app-db
-                   (assoc ::loading? true)
-                   (dissoc ::response? ::results))
+                   (assoc ::model/loading? true)
+                   (dissoc ::model/response? ::model/results))
                app-db-after)))
 
     (t/testing "request is as expected"
       (t/is (= {:method :post,
-                :uri "/db-run",
+                :uri "/beta-db-run",
                 :params
                 {:tx-type :sql,
                  :query "SELECT *, _valid_from FROM docs",
@@ -45,8 +41,8 @@
                    :txs
                    "INSERT INTO docs (_id, col1) VALUES (1, 'foo');\nINSERT INTO docs RECORDS {_id: 2, col1: 'bar', col2:' baz'};"}]},
                 :timeout 3000,
-                :on-success [:xt-play.model.run/request-success],
-                :on-failure [:xt-play.model.run/request-failure]}
+                :on-success [::model/request-success],
+                :on-failure [::model/request-failure]}
                (dissoc opts :format :response-format))))))
 
 (t/run-tests)
