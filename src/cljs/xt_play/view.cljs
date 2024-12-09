@@ -112,7 +112,7 @@
     [title "Play"]]])
 
 (defn- header [tx-type]
-  [:header {:class "sticky top-0 z-50 bg-gray-200 py-2 px-4"}
+  [:header {:class "max-md:sticky top-0 z-50 bg-gray-200 py-2 px-4"}
    [:div {:class "container mx-auto flex flex-col md:flex-row items-center gap-1"}
     [:div {:class "w-full flex flex-row items-center gap-4"}
      logo
@@ -129,7 +129,7 @@
   (when (:show-beta? config/config)
     (let [expanded? (r/atom false)]
       (fn []
-        [:footer {:class "sticky bottom-0 z-50 bg-red-200 py-2 px-4"}
+        [:footer {:class "sticky max-md:hidden bottom-0 z-50 bg-red-200 py-2 px-4"}
          [:div {:class "container text-red-900 mx-auto flex flex-col items-center gap-1 cursor-pointer"
                 :on-click #(swap! expanded? not)}
           (if-not @expanded?
