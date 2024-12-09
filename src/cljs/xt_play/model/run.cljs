@@ -25,7 +25,9 @@
 
 (rf/reg-event-fx
  ::run
- (fn [{:keys [db]}] (run db)))
+ (fn [{:keys [db]}]
+   (merge (run db)
+          {:dispatch [:update-url]})))
 
 (rf/reg-event-db
  ::request-success

@@ -16,7 +16,6 @@
 
 ;; Todo
 ;; - pull out components to own ns
-;; - standardize update / change events
 
 (defn- language-dropdown [tx-type]
   [dropdown {:items model/items
@@ -25,6 +24,13 @@
              :label (get config/tx-types tx-type)}])
 
 (defn- spinner [] [:div "Loading..."]) ;; todo spinners spin
+
+(defn- editor-update-opts [id source]
+  {:source source
+   :on-change #(rf/dispatch (if (= :query id)
+                              [:set-query %]
+                              [::tx-batch/assoc id :txs %]))
+   :on-blur #(rf/dispatch [:update-url])})
 
 (defn- display-error [{:keys [exception message data]}]
   [:div {:class "flex flex-col gap-2"}
@@ -74,9 +80,7 @@
 
 (defn- run-button []
   [button {:class "bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded-sm"
-           :on-click (fn [_]
-                       (rf/dispatch [::run/run])
-                       (rf/dispatch [:update-url]))}
+           :on-click #(rf/dispatch [::run/run])}
    [:div {:class "flex flex-row gap-1 items-center"}
     "Run"
     [:> PlayIcon {:class "h-5 w-5"}]]])
@@ -165,10 +169,9 @@
      [:div {:class "flex flex-row justify-center items-center py-1 px-5 bg-gray-200"}
       [input-system-time id system-time]
       [reset-system-time-button id]])
-   [editor {:class "border md:flex-grow min-h-36"
-            :source txs
-            :on-change #(rf/dispatch [::tx-batch/assoc id :txs %])
-            :on-blur #(rf/dispatch [:update-url])}]])
+   [editor (merge
+            (editor-update-opts id txs)
+            {:class "border md:flex-grow min-h-36"})]])
 
 (defn- multiple-transactions [{:keys [editor]} tx-batches]
   [:<>
@@ -187,10 +190,9 @@
        [:> XMarkIcon {:class "h-5 w-5 cursor-pointer"
                       :on-click #(rf/dispatch [:fx [[:dispatch [::tx-batch/delete id]]
                                                     [:dispatch [:update-url]]]])}]]
-      [editor {:class "border md:flex-grow min-h-36"
-               :source txs
-               :on-change #(rf/dispatch [::tx-batch/assoc id :txs %])
-               :on-blur #(rf/dispatch [:update-url])}]])])
+      [editor (merge
+               (editor-update-opts id txs)
+               {:class "border md:flex-grow min-h-36"})]])])
 
 (defn- transactions [{:keys [editor]}]
   [:div {:class "mx-4 md:mx-0 md:ml-4 md:flex-1 flex flex-col"}
@@ -215,11 +217,9 @@
 (defn- query [{:keys [editor]}]
   [:div {:class "mx-4 md:mx-0 md:mr-4 md:flex-1 flex flex-col"}
    [:h2 "Query:"]
-   [editor {:class "md:flex-grow h-full min-h-36 border"
-            :source @(rf/subscribe [:query])
-            :on-change #(rf/dispatch [:set-query %])
-            :on-blur #(rf/dispatch [:fx [[:dispatch [:set-query %]]
-                                         [:dispatch [:update-url]]]])}]])
+   [editor (merge
+            (editor-update-opts :query @(rf/subscribe [:query]))
+            {:class "md:flex-grow h-full min-h-36 border"})]])
 
 (def ^:private initial-message [:p {:class "text-gray-400"} "Enter a query to see results"])
 (def ^:private no-results-message "No results returned")
