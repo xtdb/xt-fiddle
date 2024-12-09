@@ -31,7 +31,7 @@
       (when system-time
         ["COMMIT"])])))
 
-(defn- run! [node tx-type tx-batches query]
+(defn- run!-tx [node tx-type tx-batches query]
   (let [tx-batches (->> tx-batches
                         (map #(update % :system-time util/format-system-time))
                         (map #(update % :txs (partial encode-txs tx-type))))]
@@ -48,7 +48,7 @@
   (let [res (xt/q node query (when (string? query)
                                {:key-fn :snake-case-string}))]
     (log/info tx-type "XTDB query response:" res)
-    (util/map-results->rows res)))
+    res))
 
 (defn- PGobject->clj [v]
   (if (= org.postgresql.util.PGobject (type v))
@@ -78,14 +78,26 @@
 (defn run!!
   "Given transaction batches, a query and the type of transaction to
   use, will run transaction batches and queries sequentially,
-  returning the last query response."
+  returning the last query response in column format."
   [{:keys [tx-batches query tx-type]}]
   (let [query (if (= "xtql" tx-type) (util/read-edn query) query)]
     (try
       (with-open [node (xtn/start-node {})]
         (if (= "sql-beta" tx-type)
           (run!-with-jdbc-conn tx-batches query)
-          (run! node tx-type tx-batches query)))
+          (util/map-results->rows
+           (run!-tx node tx-type tx-batches query))))
       (catch Exception e
         (log/warn :submit-error {:e e})
         (throw e)))))
+
+(defn docs-run!!
+  "Given transaction batches and a query from the docs, will return the query
+  response in map format. Assumes tx type is sql."
+  [{:keys [tx-batches query]}]
+  (try
+    (with-open [node (xtn/start-node {})]
+      (run!-tx node "sql" tx-batches query))
+    (catch Exception e
+      (log/warn :submit-error {:e e})
+      (throw e))))

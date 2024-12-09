@@ -166,3 +166,14 @@
               (->  (t-file "sql-multi-transaction")
                    (assoc-in [:parameters :body :query] "SELECT * FROM people")
                    (assoc-in [:parameters :body :tx-type] "sql-beta")))))))
+
+(t/deftest docs-run
+  (t/testing "docs run returns map results"
+    (t/is
+     (= {:status 200,
+         :body
+         [{"_id" 2, "favorite_color" "red", "name" "carol"}
+          {"_id" 9, "likes" ["fishing" 3.14 {"nested" "data"}], "name" "bob"}]}
+        (h/docs-run-handler
+         (->  (t-file "sql-multi-transaction")
+              (assoc-in [:parameters :body :query] "SELECT * FROM people")))))))

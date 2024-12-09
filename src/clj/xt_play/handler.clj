@@ -43,7 +43,8 @@
 (s/def ::tx-batches (s/coll-of (s/keys :req-un [::system-time ::txs])))
 (s/def ::query string?)
 (s/def ::tx-type #{"sql-beta" "xtql" "sql"})
-(s/def ::db-run (s/keys :req-un [::tx-batches ::query ::tx-type]))
+(s/def ::db-run (s/keys :req-un [::tx-batches ::query]))
+(s/def ::beta-db-run (s/keys :req-un [::tx-batches ::query ::tx-type]))
 
 (defn- handle-client-error [ex _]
   {:status 400
@@ -74,6 +75,14 @@
      :body result}
     {:status 400}))
 
+(defn docs-run-handler [{{body :body} :parameters :as request}]
+  (log/debug "docs-run-handler" request)
+  (log/info :docs-db-run body)
+  (if-let [result (txs/docs-run!! body)]
+    {:status 200
+     :body result}
+    {:status 400}))
+
 (def routes
   (ring/router
    [["/"
@@ -82,9 +91,16 @@
                        (-> (response/response view/index)
                            (response/content-type "text/html")))}}]
 
-    ["/db-run"
+    ["/db-run" ;; if the contract for this changes, it'll break the docs, so
+     ;; either docs need to change, or needs to remain backward
+     ;; compatible
      {:post {:summary "Run transactions + a query"
              :parameters {:body ::db-run}
+             :handler #'docs-run-handler}}]
+
+    ["/beta-db-run"
+     {:post {:summary "Run transactions + a query"
+             :parameters {:body ::beta-db-run}
              :handler #'run-handler}}]
 
     ["/public/*" (ring/create-resource-handler)]]

@@ -12,7 +12,7 @@
                                           util/format-system-time)
                                  (tx-batch/batch-list db))}]
     {:method :post
-     :uri "/db-run"
+     :uri "/beta-db-run"
      :params params
      :timeout 3000
      :format (ajax/json-request-format)
