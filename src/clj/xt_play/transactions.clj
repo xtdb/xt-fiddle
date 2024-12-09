@@ -105,3 +105,13 @@
     (catch Exception e
       (log/warn :submit-error {:e e})
       (throw e))))
+
+(comment
+  (with-open [node (xtn/start-node {})]
+    (doseq [st [#inst "2022" #inst "2021"]]
+      (let [tx (xt/submit-tx node [] {:system-time st})
+            results (xt/q node '(from :xt/txs [{:xt/id $tx-id} xt/error])
+                          {:basis {:at-tx tx}
+                           :args {:tx-id (:tx-id tx)}})]
+        (when-let [error (-> results first :xt/error)]
+          (throw (ex-info "Transaction error" {:error error})))))))

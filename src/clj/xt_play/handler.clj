@@ -13,9 +13,7 @@
             [ring.middleware.params :as params]
             [ring.util.response :as response]
             [xt-play.transactions :as txs]
-            [xt-play.view :as view]
-            [xtdb.api :as xt]
-            [xtdb.node :as xtn]))
+            [xt-play.view :as view]))
 
 ;; TODO:
 ;; [x] Send tx data back asis - data manipulation server side
@@ -124,13 +122,3 @@
 
 (defmethod ig/init-key ::handler [_ _opts]
   handler)
-
-(comment
-  (with-open [node (xtn/start-node {})]
-    (doseq [st [#inst "2022" #inst "2021"]]
-      (let [tx (xt/submit-tx node [] {:system-time st})
-            results (xt/q node '(from :xt/txs [{:xt/id $tx-id} xt/error])
-                          {:basis {:at-tx tx}
-                           :args {:tx-id (:tx-id tx)}})]
-        (when-let [error (-> results first :xt/error)]
-          (throw (ex-info "Transaction error" {:error error})))))))

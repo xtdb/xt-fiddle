@@ -33,7 +33,7 @@
                    (assoc ::loading? true)
                    (dissoc ::response? ::results))
                app-db-after)))
-    (def opts opts)
+
     (t/testing "request is as expected"
       (t/is (= {:method :post,
                 :uri "/db-run",
