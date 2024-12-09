@@ -1,6 +1,7 @@
 (ns xt-play.transactions
   (:require [clojure.string :as str]
             [clojure.data.json :as json]
+            [clojure.instant :refer [read-instant-date]]
             [clojure.tools.logging :as log]
             [next.jdbc :as jdbc]
             [next.jdbc.result-set :as jdbc-res]
@@ -31,9 +32,12 @@
       (when system-time
         ["COMMIT"])])))
 
+(defn format-system-time [s]
+  (when s (read-instant-date s)))
+
 (defn- run!-tx [node tx-type tx-batches query]
   (let [tx-batches (->> tx-batches
-                        (map #(update % :system-time util/format-system-time))
+                        (map #(update % :system-time format-system-time))
                         (map #(update % :txs (partial encode-txs tx-type))))]
     (doseq [{:keys [system-time txs] :as batch} tx-batches]
       (log/info tx-type "running batch: " batch)
