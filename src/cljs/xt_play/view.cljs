@@ -9,11 +9,13 @@
             [xt-play.components.dropdown :refer [dropdown]]
             [xt-play.components.editor :as editor]
             [xt-play.components.highlight :as hl]
+            [xt-play.components.popup :as popup]
             [xt-play.config :as config]
             [xt-play.model.client :as model]
             [xt-play.model.interval :as i]
             [xt-play.model.run :as run]
-            [xt-play.model.tx-batch :as tx-batch]))
+            [xt-play.model.tx-batch :as tx-batch]
+            [xt-play.views.help :as help]))
 
 ;; Todo
 ;; - pull out components to own ns
@@ -127,7 +129,8 @@
     [:div {:class "w-full flex flex-row items-center gap-4"}
      logo
      [:span {:class "text-sm text-gray-400"}
-      @(rf/subscribe [:version])]]
+      @(rf/subscribe [:version])]
+     [help/slider]]
     [:div {:class "max-md:hidden flex-grow"}]
     [:div {:class "w-full flex flex-row items-center gap-1 md:justify-end"}
      [language-dropdown tx-type]
@@ -209,8 +212,8 @@
                      ;; stop editor expanding beyond the viewport
                      "md:max-w-[48vw] lg:max-w-[49vw]")}
    [:h2 "Transactions:"]
-   ; NOTE: The min-h-0 somehow makes sure the editor doesn't
-   ;       overflow the flex container
+                                        ; NOTE: The min-h-0 somehow makes sure the editor doesn't
+                                        ;       overflow the flex container
    [:div {:class "grow min-h-0 overflow-y-auto flex flex-col gap-2"}
     (let [tx-batches @(rf/subscribe [::tx-batch/id-batch-pairs])]
       (if (= 1 (count tx-batches))
