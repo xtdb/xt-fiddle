@@ -23,3 +23,7 @@
                         (mapv #(get row %) ks))
                       results)))
         results)})])
+
+
+(defn is-query? [s]
+  (re-find #"(?i)^\s*(WITH\s+.*?SELECT|SELECT)\b" s))

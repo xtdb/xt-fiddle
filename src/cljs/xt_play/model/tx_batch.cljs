@@ -82,5 +82,4 @@
    :txs (config/default-transaction tx-type)})
 
 (defn default-query [tx-type]
-  {:query "true"
-   :txs (config/default-query tx-type)})
+  {:txs (config/default-query tx-type)})
