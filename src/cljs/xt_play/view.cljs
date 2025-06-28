@@ -12,7 +12,8 @@
             [xt-play.config :as config]
             [xt-play.model.client :as model]
             [xt-play.model.run :as run]
-            [xt-play.model.tx-batch :as tx-batch]))
+            [xt-play.model.tx-batch :as tx-batch]
+            [xt-play.util :as util]))
 
 ;; Todo
 ;; - pull out components to own ns
@@ -253,11 +254,10 @@
                     (cond
                       (not response?) initial-message
                       (seq error) [display-error error (str position "-" idx)]
-                      (and (:query statements)
+                      (and (util/is-query? (:txs statements))
                            (= [[]] result)) no-results-message
-                      (and (not (:query statements))
-                           (= [[]] result)) [:div {:class "pl-2 pt-2"}
-                                             "Statement succeeded."]
+                      (= [[]] result) [:div {:class "pl-2 pt-2"}
+                                       "Statement succeeded."]
                       (every? empty? result) (empty-rows-message result)
                       (seq result) [display-table result (str position "-" idx)]
                       :else no-results-message)
